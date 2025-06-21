@@ -22,7 +22,7 @@ impl UspaceContext {
         Self(TrapFrame {
             r: regs,
             usp: ustack_top.as_usize() as _,
-            tpidr_el0: 0,
+            tpidr: 0,
             elr: entry as _,
             spsr: (SPSR_EL1::M::EL0t
                 + SPSR_EL1::D::Masked

@@ -11,7 +11,7 @@ pub struct TrapFrame {
     /// User Stack Pointer (SP_EL0).
     pub usp: u64,
     /// Software Thread ID Register (TPIDR_EL0).
-    pub tpidr_el0: u64,
+    pub tpidr: u64,
     /// Exception Link Register (ELR_EL1).
     pub elr: u64,
     /// Saved Process Status Register (SPSR_EL1).
@@ -25,7 +25,7 @@ impl fmt::Debug for TrapFrame {
             writeln!(f, "    r{i}: {reg:#x},")?;
         }
         writeln!(f, "    usp: {:#x},", self.usp)?;
-        writeln!(f, "    tpidr_el0: {:#x},", self.tpidr_el0)?;
+        writeln!(f, "    tpidr: {:#x},", self.tpidr)?;
         writeln!(f, "    elr: {:#x},", self.elr)?;
         writeln!(f, "    spsr: {:#x},", self.spsr)?;
         write!(f, "}}")?;
