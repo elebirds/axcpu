@@ -22,6 +22,7 @@ impl UspaceContext {
         Self(TrapFrame {
             r: regs,
             usp: ustack_top.as_usize() as _,
+            tpidr_el0: 0,
             elr: entry as _,
             spsr: (SPSR_EL1::M::EL0t
                 + SPSR_EL1::D::Masked
@@ -56,12 +57,19 @@ impl UspaceContext {
             core::arch::asm!(
                 "
                 mov     sp, x1
-                ldp     x30, x9, [x0, 30 * 8]
-                ldp     x10, x11, [x0, 32 * 8]
+                
+                // backup kernel tpidr_el0
+                mrs     x1, tpidr_el0
+                msr     tpidrro_el0, x1
+                
+                ldp     x11, x12, [x0, 33 * 8]
+                ldp     x9, x10, [x0, 31 * 8]
                 msr     sp_el0, x9
-                msr     elr_el1, x10
-                msr     spsr_el1, x11
+                msr     tpidr_el0, x10
+                msr     elr_el1, x11
+                msr     spsr_el1, x12
 
+                ldr     x30, [x0, 30 * 8]
                 ldp     x28, x29, [x0, 28 * 8]
                 ldp     x26, x27, [x0, 26 * 8]
                 ldp     x24, x25, [x0, 24 * 8]

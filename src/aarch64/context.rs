@@ -10,6 +10,8 @@ pub struct TrapFrame {
     pub r: [u64; 31],
     /// User Stack Pointer (SP_EL0).
     pub usp: u64,
+    /// Software Thread ID Register (TPIDR_EL0).
+    pub tpidr_el0: u64,
     /// Exception Link Register (ELR_EL1).
     pub elr: u64,
     /// Saved Process Status Register (SPSR_EL1).
@@ -23,6 +25,7 @@ impl fmt::Debug for TrapFrame {
             writeln!(f, "    r{i}: {reg:#x},")?;
         }
         writeln!(f, "    usp: {:#x},", self.usp)?;
+        writeln!(f, "    tpidr_el0: {:#x},", self.tpidr_el0)?;
         writeln!(f, "    elr: {:#x},", self.elr)?;
         writeln!(f, "    spsr: {:#x},", self.spsr)?;
         write!(f, "}}")?;
@@ -125,6 +128,16 @@ impl TrapFrame {
     pub const fn set_ra(&mut self, lr: usize) {
         self.r[30] = lr as _;
     }
+
+    /// Gets the TLS area.
+    pub fn tls(&self) -> usize {
+        self.tpidr as _
+    }
+
+    /// Sets the TLS area.
+    pub fn set_tls(&mut self, tls: usize) {
+        self.tpidr = tls as _;
+    }
 }
 
 /// FP & SIMD registers.
@@ -152,7 +165,7 @@ impl FpState {
 ///
 /// - Callee-saved registers
 /// - Stack pointer register
-/// - Thread pointer register (for thread-local storage, currently unsupported)
+/// - Thread pointer register (for kernel-space thread-local storage)
 /// - FP/SIMD registers
 ///
 /// On context switch, current task saves its context from CPU to memory,
@@ -162,7 +175,6 @@ impl FpState {
 #[derive(Debug, Default)]
 pub struct TaskContext {
     pub sp: u64,
-    pub tpidr_el0: u64,
     pub r19: u64,
     pub r20: u64,
     pub r21: u64,
@@ -175,6 +187,8 @@ pub struct TaskContext {
     pub r28: u64,
     pub r29: u64,
     pub lr: u64, // r30
+    /// Thread Pointer
+    pub tpidr_el0: u64,
     /// The `ttbr0_el1` register value, i.e., the page table root.
     #[cfg(feature = "uspace")]
     pub ttbr0_el1: memory_addr::PhysAddr,
@@ -203,16 +217,6 @@ impl TaskContext {
         self.tpidr_el0 = tls_area.as_usize() as u64;
     }
 
-    /// Gets the TLS area.
-    pub fn tls(&self) -> VirtAddr {
-        VirtAddr::from(self.tpidr_el0 as usize)
-    }
-
-    /// Sets the TLS area.
-    pub fn set_tls(&mut self, tls_area: VirtAddr) {
-        self.tpidr_el0 = tls_area.as_usize() as u64;
-    }
-
     /// Changes the page table root in this context.
     ///
     /// The hardware register for user page table root (`ttbr0_el1` for aarch64 in EL1)
@@ -227,6 +231,11 @@ impl TaskContext {
     /// It first saves the current task's context from CPU to this place, and then
     /// restores the next task's context from `next_ctx` to CPU.
     pub fn switch_to(&mut self, next_ctx: &Self) {
+        #[cfg(feature = "tls")]
+        {
+            self.tpidr_el0 = crate::asm::read_thread_pointer() as _;
+            unsafe { crate::asm::write_thread_pointer(next_ctx.tpidr_el0 as _) };
+        }
         #[cfg(feature = "fp-simd")]
         self.fp_state.switch_to(&next_ctx.fp_state);
         #[cfg(feature = "uspace")]
@@ -243,26 +252,24 @@ unsafe extern "C" fn context_switch(_current_task: &mut TaskContext, _next_task:
     naked_asm!(
         "
         // save old context (callee-saved registers)
-        stp     x29, x30, [x0, 12 * 8]
-        stp     x27, x28, [x0, 10 * 8]
-        stp     x25, x26, [x0, 8 * 8]
-        stp     x23, x24, [x0, 6 * 8]
-        stp     x21, x22, [x0, 4 * 8]
-        stp     x19, x20, [x0, 2 * 8]
+        stp     x29, x30, [x0, 11 * 8]
+        stp     x27, x28, [x0, 9 * 8]
+        stp     x25, x26, [x0, 7 * 8]
+        stp     x23, x24, [x0, 5 * 8]
+        stp     x21, x22, [x0, 3 * 8]
+        stp     x19, x20, [x0, 1 * 8]
         mov     x19, sp
-        mrs     x20, tpidr_el0
-        stp     x19, x20, [x0]
+        str     x19, [x0]
 
         // restore new context
-        ldp     x19, x20, [x1]
+        ldr     x19, [x1]
         mov     sp, x19
-        msr     tpidr_el0, x20
-        ldp     x19, x20, [x1, 2 * 8]
-        ldp     x21, x22, [x1, 4 * 8]
-        ldp     x23, x24, [x1, 6 * 8]
-        ldp     x25, x26, [x1, 8 * 8]
-        ldp     x27, x28, [x1, 10 * 8]
-        ldp     x29, x30, [x1, 12 * 8]
+        ldp     x19, x20, [x1, 1 * 8]
+        ldp     x21, x22, [x1, 3 * 8]
+        ldp     x23, x24, [x1, 5 * 8]
+        ldp     x25, x26, [x1, 7 * 8]
+        ldp     x27, x28, [x1, 9 * 8]
+        ldp     x29, x30, [x1, 11 * 8]
 
         ret",
     )

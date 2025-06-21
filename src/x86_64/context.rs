@@ -6,6 +6,9 @@ use memory_addr::VirtAddr;
 #[repr(C)]
 #[derive(Debug, Default, Clone, Copy)]
 pub struct TrapFrame {
+    pub fs_base: u64,
+    pub __pad: u64,
+
     pub rax: u64,
     pub rcx: u64,
     pub rdx: u64,
@@ -141,6 +144,16 @@ impl TrapFrame {
             core::ptr::write(self.rsp as *mut usize, addr);
         }
     }
+
+    /// Gets the TLS area.
+    pub fn tls(&self) -> usize {
+        self.fs_base as _
+    }
+
+    /// Sets the TLS area.
+    pub fn set_tls(&mut self, tls_area: usize) {
+        self.fs_base = tls_area as _;
+    }
 }
 
 #[repr(C)]
@@ -219,7 +232,7 @@ impl fmt::Debug for ExtendedState {
 ///
 /// - Callee-saved registers
 /// - Stack pointer register
-/// - Thread pointer register (for thread-local storage, currently unsupported)
+/// - Thread pointer register (for kernel-space thread-local storage)
 /// - FP/SIMD registers
 ///
 /// On context switch, current task saves its context from CPU to memory,
@@ -238,9 +251,11 @@ pub struct TaskContext {
     pub kstack_top: VirtAddr,
     /// `RSP` after all callee-saved registers are pushed.
     pub rsp: u64,
-    /// Thread Local Storage (TLS).
+    /// Thread pointer (FS segment base address)
     pub fs_base: usize,
-    /// The `gs_base` register value.
+    /// User space Thread pointer (GS segment base address)
+    ///
+    /// During task switching, it is written to `KernelGSBase` MSR.
     #[cfg(feature = "uspace")]
     pub gs_base: usize,
     /// Extended states, i.e., FP/SIMD states.
@@ -324,7 +339,7 @@ impl TaskContext {
             self.ext_state.save();
             next_ctx.ext_state.restore();
         }
-        #[cfg(any(feature = "tls", feature = "uspace"))]
+        #[cfg(feature = "tls")]
         unsafe {
             self.fs_base = crate::asm::read_thread_pointer();
             crate::asm::write_thread_pointer(next_ctx.fs_base);

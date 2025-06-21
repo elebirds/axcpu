@@ -146,6 +146,16 @@ impl TrapFrame {
     pub const fn set_ra(&mut self, ra: usize) {
         self.regs.ra = ra;
     }
+
+    /// Gets the TLS area.
+    pub fn tls(&self) -> usize {
+        self.regs.tp
+    }
+
+    /// Sets the TLS area.
+    pub fn set_tls(&mut self, tls_area: usize) {
+        self.regs.tp = tls_area;
+    }
 }
 
 /// Saved hardware states of a task.
@@ -154,7 +164,7 @@ impl TrapFrame {
 ///
 /// - Callee-saved registers
 /// - Stack pointer register
-/// - Thread pointer register (for thread-local storage, currently unsupported)
+/// - Thread pointer register (for kernel-space thread-local storage)
 /// - FP/SIMD registers
 ///
 /// On context switch, current task saves its context from CPU to memory,
@@ -179,7 +189,7 @@ pub struct TaskContext {
     pub s9: usize,
     pub s10: usize,
     pub s11: usize,
-
+    /// Thread Pointer
     pub tp: usize,
     /// The `satp` register value, i.e., the page table root.
     #[cfg(feature = "uspace")]
@@ -208,16 +218,6 @@ impl TaskContext {
     pub fn init(&mut self, entry: usize, kstack_top: VirtAddr, tls_area: VirtAddr) {
         self.sp = kstack_top.as_usize();
         self.ra = entry;
-        self.tp = tls_area.as_usize();
-    }
-
-    /// Gets the TLS area.
-    pub fn tls(&self) -> VirtAddr {
-        VirtAddr::from(self.tp)
-    }
-
-    /// Sets the TLS area.
-    pub fn set_tls(&mut self, tls_area: VirtAddr) {
         self.tp = tls_area.as_usize();
     }
 
