@@ -184,7 +184,7 @@ pub struct ExtendedState {
     pub fxsave_area: FxsaveArea,
 }
 
-#[cfg(feature = "fp_simd")]
+#[cfg(feature = "fp-simd")]
 impl ExtendedState {
     #[inline]
     fn save(&mut self) {
@@ -244,7 +244,7 @@ pub struct TaskContext {
     #[cfg(feature = "uspace")]
     pub gs_base: usize,
     /// Extended states, i.e., FP/SIMD states.
-    #[cfg(feature = "fp_simd")]
+    #[cfg(feature = "fp-simd")]
     pub ext_state: ExtendedState,
     /// The `CR3` register value, i.e., the page table root.
     #[cfg(feature = "uspace")]
@@ -266,7 +266,7 @@ impl TaskContext {
             fs_base: 0,
             #[cfg(feature = "uspace")]
             cr3: crate::asm::read_kernel_page_table(),
-            #[cfg(feature = "fp_simd")]
+            #[cfg(feature = "fp-simd")]
             ext_state: ExtendedState::default(),
             #[cfg(feature = "uspace")]
             gs_base: 0,
@@ -319,7 +319,7 @@ impl TaskContext {
     /// It first saves the current task's context from CPU to this place, and then
     /// restores the next task's context from `next_ctx` to CPU.
     pub fn switch_to(&mut self, next_ctx: &Self) {
-        #[cfg(feature = "fp_simd")]
+        #[cfg(feature = "fp-simd")]
         {
             self.ext_state.save();
             next_ctx.ext_state.restore();
