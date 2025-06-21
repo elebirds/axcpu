@@ -58,7 +58,6 @@ impl UspaceContext {
         unsafe {
             core::arch::asm!("
                 mov     rsp, {tf}
-                add     rsp, 16
                 pop     rax
                 pop     rcx
                 pop     rdx
@@ -74,7 +73,7 @@ impl UspaceContext {
                 pop     r13
                 pop     r14
                 pop     r15
-                add     rsp, 16     // skip vector, error_code
+                add     rsp, 32     // skip fs_base, vector, error_code
                 swapgs
                 iretq",
                 tf = in(reg) &self.0,
