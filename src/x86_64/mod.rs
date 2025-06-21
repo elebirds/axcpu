@@ -1,7 +1,6 @@
 mod context;
 mod gdt;
 mod idt;
-mod tls;
 
 pub mod asm;
 pub mod init;
@@ -11,6 +10,9 @@ mod trap;
 
 #[cfg(feature = "uspace")]
 mod syscall;
+
+#[cfg(feature = "uspace")]
+mod tls;
 
 #[cfg(feature = "uspace")]
 pub mod uspace;

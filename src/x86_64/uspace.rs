@@ -54,7 +54,7 @@ impl UspaceContext {
     pub unsafe fn enter_uspace(&self, kstack_top: VirtAddr) -> ! {
         crate::asm::disable_irqs();
         assert_eq!(super::gdt::read_tss_rsp0(), kstack_top);
-        crate::tls::switch_to_user_fs_base(&self.0);
+        super::tls::switch_to_user_fs_base(&self.0);
         unsafe {
             core::arch::asm!("
                 mov     rsp, {tf}
