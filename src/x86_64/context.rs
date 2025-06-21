@@ -147,12 +147,12 @@ impl TrapFrame {
     }
 
     /// Gets the TLS area.
-    pub fn tls(&self) -> usize {
+    pub const fn tls(&self) -> usize {
         self.fs_base as _
     }
 
     /// Sets the TLS area.
-    pub fn set_tls(&mut self, tls_area: usize) {
+    pub const fn set_tls(&mut self, tls_area: usize) {
         self.fs_base = tls_area as _;
     }
 }
@@ -308,16 +308,6 @@ impl TaskContext {
             self.rsp = frame_ptr as u64;
         }
         self.kstack_top = kstack_top;
-        self.fs_base = tls_area.as_usize();
-    }
-
-    /// Gets the TLS area.
-    pub fn tls(&self) -> VirtAddr {
-        VirtAddr::from(self.fs_base)
-    }
-
-    /// Sets the TLS area.
-    pub fn set_tls(&mut self, tls_area: VirtAddr) {
         self.fs_base = tls_area.as_usize();
     }
 
